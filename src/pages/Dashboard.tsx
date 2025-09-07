@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import ItemCard from '@/components/ItemCard';
+import BorrowRequestModal from '@/components/BorrowRequestModal';
+import AddItemModal from '@/components/AddItemModal';
 import { Search, Filter, Plus, BookOpen, Laptop, Bike, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +23,11 @@ interface Item {
   is_available: boolean;
   created_at: string;
   profiles?: {
+    full_name: string;
+    trust_score?: number;
+    total_ratings?: number;
+  };
+  owner?: {
     full_name: string;
     trust_score?: number;
     total_ratings?: number;
@@ -45,6 +52,9 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [showBorrowModal, setShowBorrowModal] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -101,10 +111,11 @@ const Dashboard = () => {
   });
 
   const handleBorrowRequest = (itemId: string) => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "Borrow request functionality will be available soon!",
-    });
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      setSelectedItem(item);
+      setShowBorrowModal(true);
+    }
   };
 
   const categories = [
@@ -253,7 +264,7 @@ const Dashboard = () => {
       ) : sortedItems.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No items found matching your criteria.</p>
-          <Button variant="temple" className="mt-4">
+          <Button variant="temple" className="mt-4" onClick={() => setShowAddItemModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             List the first item
           </Button>
@@ -276,6 +287,39 @@ const Dashboard = () => {
           ))}
         </div>
       )}
+
+      {/* Add floating action button */}
+      <div className="fixed bottom-6 right-6">
+        <Button 
+          variant="temple" 
+          size="lg" 
+          className="rounded-full h-14 w-14 shadow-lg hover:shadow-xl transition-shadow"
+          onClick={() => setShowAddItemModal(true)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Modals */}
+      {selectedItem && (
+        <BorrowRequestModal
+          isOpen={showBorrowModal}
+          onClose={() => {
+            setShowBorrowModal(false);
+            setSelectedItem(null);
+          }}
+          item={selectedItem}
+        />
+      )}
+
+      <AddItemModal
+        isOpen={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        onItemAdded={() => {
+          fetchItems();
+          setShowAddItemModal(false);
+        }}
+      />
     </div>
   );
 };

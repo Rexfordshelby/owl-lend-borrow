@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Bell, Plus, Search, LogOut, User, Settings } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -65,10 +66,7 @@ const Header = () => {
               </Button>
 
               {/* Notifications */}
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-3 w-3 bg-temple-red rounded-full text-xs"></span>
-              </Button>
+              <NotificationCenter />
 
               {/* User Menu */}
               <DropdownMenu>
