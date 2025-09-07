@@ -18,6 +18,9 @@ interface Item {
   category: string;
   condition: string;
   daily_rate?: number;
+  hourly_rate?: number;
+  is_service?: boolean;
+  service_type?: string;
   image_urls?: string[];
   location?: string;
   is_available: boolean;
@@ -51,6 +54,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [itemType, setItemType] = useState<string>('all');
   const [sortBy, setSortBy] = useState('newest');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
@@ -94,15 +98,22 @@ const Dashboard = () => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesType = itemType === 'all' || 
+                       (itemType === 'items' && !item.is_service) ||
+                       (itemType === 'services' && item.is_service);
+    return matchesSearch && matchesCategory && matchesType;
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
     switch (sortBy) {
       case 'price_low':
-        return (a.daily_rate || 0) - (b.daily_rate || 0);
+        const priceA = a.is_service ? (a.hourly_rate || 0) : (a.daily_rate || 0);
+        const priceB = b.is_service ? (b.hourly_rate || 0) : (b.daily_rate || 0);
+        return priceA - priceB;
       case 'price_high':
-        return (b.daily_rate || 0) - (a.daily_rate || 0);
+        const priceHighA = a.is_service ? (a.hourly_rate || 0) : (a.daily_rate || 0);
+        const priceHighB = b.is_service ? (b.hourly_rate || 0) : (b.daily_rate || 0);
+        return priceHighB - priceHighA;
       case 'rating':
         return (b.profiles?.trust_score || 0) - (a.profiles?.trust_score || 0);
       default:
@@ -128,7 +139,14 @@ const Dashboard = () => {
     { value: 'tools', label: 'Tools' },
     { value: 'clothing', label: 'Clothing' },
     { value: 'furniture', label: 'Furniture' },
+    { value: 'services', label: 'Services' },
     { value: 'other', label: 'Other' },
+  ];
+
+  const itemTypes = [
+    { value: 'all', label: 'All' },
+    { value: 'items', label: 'Items' },
+    { value: 'services', label: 'Services' },
   ];
 
   return (
@@ -192,8 +210,8 @@ const Dashboard = () => {
                 <Plus className="h-4 w-4 text-temple-red" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{items.length}</p>
-                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-2xl font-bold">{items.filter(i => i.is_service).length}</p>
+                <p className="text-sm text-muted-foreground">Services</p>
               </div>
             </div>
           </CardContent>
@@ -209,13 +227,27 @@ const Dashboard = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search for items..."
+                  placeholder="Search for items and services..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
+
+            {/* Type Filter */}
+            <Select value={itemType} onValueChange={setItemType}>
+              <SelectTrigger className="w-full md:w-32">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {itemTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Category Filter */}
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -263,10 +295,12 @@ const Dashboard = () => {
         </div>
       ) : sortedItems.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground text-lg">No items found matching your criteria.</p>
+          <p className="text-muted-foreground text-lg">
+            No {itemType === 'all' ? 'items or services' : itemType} found matching your criteria.
+          </p>
           <Button variant="temple" className="mt-4" onClick={() => setShowAddItemModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            List the first item
+            List your first {itemType === 'services' ? 'service' : 'item'}
           </Button>
         </div>
       ) : (

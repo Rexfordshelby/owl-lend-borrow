@@ -24,9 +24,12 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     category: '',
     condition: '',
     daily_rate: '',
+    hourly_rate: '',
     deposit_amount: '',
     location: '',
     tags: [] as string[],
+    is_service: false,
+    service_type: '',
   });
   const [newTag, setNewTag] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +45,22 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     { value: 'tools', label: 'Tools' },
     { value: 'clothing', label: 'Clothing' },
     { value: 'furniture', label: 'Furniture' },
+    { value: 'services', label: 'Services' },
     { value: 'other', label: 'Other' },
+  ];
+
+  const serviceTypes = [
+    'Tutoring',
+    'Homework Help',
+    'Language Exchange',
+    'Pet Sitting',
+    'House Sitting',
+    'Moving Help',
+    'Tech Support',
+    'Photography',
+    'Design Work',
+    'Music Lessons',
+    'Other'
   ];
 
   const conditions = [
@@ -52,8 +70,17 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     { value: 'poor', label: 'Poor' },
   ];
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: string | boolean) => {
+    if (field === 'is_service') {
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value === 'true' || value === true,
+        condition: value === 'true' || value === true ? 'excellent' : prev.condition,
+        service_type: value === 'true' || value === true ? prev.service_type : ''
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const addTag = () => {
@@ -92,20 +119,23 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
       const { error } = await supabase.from('items').insert({
         title: formData.title,
         description: formData.description || null,
-        category: formData.category as 'books' | 'electronics' | 'notes' | 'bikes' | 'sports_equipment' | 'tools' | 'clothing' | 'furniture' | 'other',
-        condition: formData.condition,
+        category: formData.category as 'books' | 'electronics' | 'notes' | 'bikes' | 'sports_equipment' | 'tools' | 'clothing' | 'furniture' | 'services' | 'other',
+        condition: formData.is_service ? 'excellent' : (formData.condition as 'excellent' | 'good' | 'fair' | 'poor'),
         daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : null,
+        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
         deposit_amount: formData.deposit_amount ? parseFloat(formData.deposit_amount) : 0,
         location: formData.location || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
         owner_id: profile.id,
-        is_available: true
+        is_available: true,
+        is_service: formData.is_service,
+        service_type: formData.is_service ? formData.service_type : null
       });
 
       if (error) throw error;
 
       toast({
-        title: "Item Listed!",
+        title: `${formData.is_service ? 'Service' : 'Item'} Listed!`,
         description: `"${formData.title}" has been successfully added to your listings.`,
       });
 
@@ -119,9 +149,12 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
         category: '',
         condition: '',
         daily_rate: '',
+        hourly_rate: '',
         deposit_amount: '',
         location: '',
         tags: [],
+        is_service: false,
+        service_type: '',
       });
     } catch (error) {
       console.error('Error creating item:', error);
@@ -139,20 +172,32 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>List an Item</DialogTitle>
+          <DialogTitle>List an {formData.is_service ? 'Service' : 'Item'}</DialogTitle>
           <DialogDescription>
-            Add an item to lend to fellow Temple University students
+            Add {formData.is_service ? 'a service' : 'an item'} to {formData.is_service ? 'offer' : 'lend'} to fellow Temple University students
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Service/Item Toggle */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="is_service"
+              checked={formData.is_service}
+              onChange={(e) => handleInputChange('is_service', e.target.checked.toString())}
+              className="rounded border-gray-300"
+            />
+            <Label htmlFor="is_service">This is a service (not a physical item)</Label>
+          </div>
+
           {/* Basic Information */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Item Title *</Label>
+              <Label htmlFor="title">{formData.is_service ? 'Service' : 'Item'} Title *</Label>
               <Input
                 id="title"
-                placeholder="e.g., MacBook Pro 2023, Organic Chemistry Textbook"
+                placeholder={formData.is_service ? "e.g., Math Tutoring, Photo Editing" : "e.g., MacBook Pro 2023, Organic Chemistry Textbook"}
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
                 required
@@ -163,7 +208,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                placeholder="Describe your item, its features, any special instructions..."
+                placeholder={formData.is_service ? "Describe your service, experience, qualifications..." : "Describe your item, its features, any special instructions..."}
                 rows={3}
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
@@ -187,38 +232,71 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Condition *</Label>
-                <Select value={formData.condition} onValueChange={(value) => handleInputChange('condition', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select condition" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {conditions.map((condition) => (
-                      <SelectItem key={condition.value} value={condition.value}>
-                        {condition.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {formData.is_service ? (
+                <div className="space-y-2">
+                  <Label>Service Type *</Label>
+                  <Select value={formData.service_type} onValueChange={(value) => handleInputChange('service_type', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select service type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Condition *</Label>
+                  <Select value={formData.condition} onValueChange={(value) => handleInputChange('condition', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conditions.map((condition) => (
+                        <SelectItem key={condition.value} value={condition.value}>
+                          {condition.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Pricing */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="daily_rate">Daily Rate ($)</Label>
-              <Input
-                id="daily_rate"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={formData.daily_rate}
-                onChange={(e) => handleInputChange('daily_rate', e.target.value)}
-              />
-            </div>
+            {formData.is_service ? (
+              <div className="space-y-2">
+                <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+                <Input
+                  id="hourly_rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.hourly_rate}
+                  onChange={(e) => handleInputChange('hourly_rate', e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="daily_rate">Daily Rate ($)</Label>
+                <Input
+                  id="daily_rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.daily_rate}
+                  onChange={(e) => handleInputChange('daily_rate', e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="deposit_amount">Deposit Amount ($)</Label>
@@ -236,10 +314,10 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
 
           {/* Location */}
           <div className="space-y-2">
-            <Label htmlFor="location">Pickup Location</Label>
+            <Label htmlFor="location">{formData.is_service ? 'Service Location' : 'Pickup Location'}</Label>
             <Input
               id="location"
-              placeholder="e.g., Library, Student Center, Dorm Building"
+              placeholder={formData.is_service ? "e.g., Library, Online, Your Location" : "e.g., Library, Student Center, Dorm Building"}
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
             />
@@ -282,9 +360,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
               type="submit" 
               variant="temple" 
               className="flex-1"
-              disabled={!formData.title || !formData.category || !formData.condition || loading}
+              disabled={!formData.title || !formData.category || (!formData.is_service && !formData.condition) || (formData.is_service && !formData.service_type) || loading}
             >
-              {loading ? "Listing..." : "List Item"}
+              {loading ? "Listing..." : `List ${formData.is_service ? 'Service' : 'Item'}`}
             </Button>
           </div>
         </form>

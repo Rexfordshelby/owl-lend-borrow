@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,10 +12,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { Bell, Plus, Search, LogOut, User, Settings } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
+import AddItemModal from './AddItemModal';
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -60,7 +62,12 @@ const Header = () => {
           {user ? (
             <>
               {/* Add Item Button */}
-              <Button variant="temple" size="sm" className="hidden sm:flex">
+              <Button 
+                variant="temple" 
+                size="sm" 
+                className="hidden sm:flex"
+                onClick={() => setShowAddModal(true)}
+              >
                 <Plus className="h-4 w-4 mr-1" />
                 List Item
               </Button>
@@ -118,6 +125,16 @@ const Header = () => {
           )}
         </div>
       </div>
+      
+      {/* Add Item Modal */}
+      <AddItemModal 
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onItemAdded={() => {
+          setShowAddModal(false);
+          // Could trigger a refresh of items here if needed
+        }}
+      />
     </header>
   );
 };

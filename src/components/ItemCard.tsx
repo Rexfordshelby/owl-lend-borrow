@@ -13,6 +13,9 @@ interface ItemCardProps {
     category: string;
     condition: string;
     daily_rate?: number;
+    hourly_rate?: number;
+    is_service?: boolean;
+    service_type?: string;
     image_urls?: string[];
     location?: string;
     is_available: boolean;
@@ -102,16 +105,26 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onBorrowRequest }) => {
           </p>
         )}
 
-        {/* Condition and Price */}
+        {/* Condition/Service Type and Price */}
         <div className="flex items-center justify-between">
-          <Badge className={getConditionColor(item.condition)}>
-            {formatCondition(item.condition)}
-          </Badge>
+          {item.is_service ? (
+            <Badge variant="outline" className="border-temple-red text-temple-red">
+              {item.service_type || 'Service'}
+            </Badge>
+          ) : (
+            <Badge className={getConditionColor(item.condition)}>
+              {formatCondition(item.condition)}
+            </Badge>
+          )}
           
-          {item.daily_rate && (
+          {(item.daily_rate || item.hourly_rate) && (
             <div className="flex items-center text-temple-red font-semibold">
               <DollarSign className="h-4 w-4" />
-              <span>{item.daily_rate}/day</span>
+              {item.is_service ? (
+                <span>{item.hourly_rate}/hour</span>
+              ) : (
+                <span>{item.daily_rate}/day</span>
+              )}
             </div>
           )}
         </div>
@@ -155,7 +168,9 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onBorrowRequest }) => {
           disabled={!item.is_available}
           onClick={() => onBorrowRequest?.(item.id)}
         >
-          {item.is_available ? "Request to Borrow" : "Unavailable"}
+          {item.is_available ? (
+            item.is_service ? "Request Service" : "Request to Borrow"
+          ) : "Unavailable"}
         </Button>
       </CardFooter>
     </Card>
