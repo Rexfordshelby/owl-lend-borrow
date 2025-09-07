@@ -14,7 +14,282 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      borrow_requests: {
+        Row: {
+          actual_return_date: string | null
+          borrower_id: string
+          created_at: string
+          end_date: string
+          id: string
+          item_id: string
+          message: string | null
+          owner_id: string
+          owner_response: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["request_status"] | null
+          total_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          actual_return_date?: string | null
+          borrower_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          item_id: string
+          message?: string | null
+          owner_id: string
+          owner_response?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["request_status"] | null
+          total_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          actual_return_date?: string | null
+          borrower_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          item_id?: string
+          message?: string | null
+          owner_id?: string
+          owner_response?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["request_status"] | null
+          total_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "borrow_requests_borrower_id_fkey"
+            columns: ["borrower_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "borrow_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "borrow_requests_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      items: {
+        Row: {
+          category: Database["public"]["Enums"]["item_category"]
+          condition: string
+          created_at: string
+          daily_rate: number | null
+          deposit_amount: number | null
+          description: string | null
+          id: string
+          image_urls: string[] | null
+          is_available: boolean | null
+          location: string | null
+          owner_id: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["item_category"]
+          condition: string
+          created_at?: string
+          daily_rate?: number | null
+          deposit_amount?: number | null
+          description?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_available?: boolean | null
+          location?: string | null
+          owner_id: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["item_category"]
+          condition?: string
+          created_at?: string
+          daily_rate?: number | null
+          deposit_amount?: number | null
+          description?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_available?: boolean | null
+          location?: string | null
+          owner_id?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          related_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          major: string | null
+          phone: string | null
+          temple_id: string | null
+          total_ratings: number | null
+          trust_score: number | null
+          updated_at: string
+          user_id: string
+          year_of_study: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          major?: string | null
+          phone?: string | null
+          temple_id?: string | null
+          total_ratings?: number | null
+          trust_score?: number | null
+          updated_at?: string
+          user_id: string
+          year_of_study?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          major?: string | null
+          phone?: string | null
+          temple_id?: string | null
+          total_ratings?: number | null
+          trust_score?: number | null
+          updated_at?: string
+          user_id?: string
+          year_of_study?: string | null
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          borrow_request_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          rating: number
+          review_type: string
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Insert: {
+          borrow_request_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+          review_type: string
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Update: {
+          borrow_request_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+          review_type?: string
+          reviewee_id?: string
+          reviewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_borrow_request_id_fkey"
+            columns: ["borrow_request_id"]
+            isOneToOne: false
+            referencedRelation: "borrow_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewee_id_fkey"
+            columns: ["reviewee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +298,23 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      item_category:
+        | "books"
+        | "electronics"
+        | "notes"
+        | "bikes"
+        | "sports_equipment"
+        | "tools"
+        | "clothing"
+        | "furniture"
+        | "other"
+      request_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "borrowed"
+        | "returned"
+        | "overdue"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +441,26 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      item_category: [
+        "books",
+        "electronics",
+        "notes",
+        "bikes",
+        "sports_equipment",
+        "tools",
+        "clothing",
+        "furniture",
+        "other",
+      ],
+      request_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "borrowed",
+        "returned",
+        "overdue",
+      ],
+    },
   },
 } as const
