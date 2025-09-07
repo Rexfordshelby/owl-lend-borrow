@@ -2,39 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* TempleBorrow Design System - Temple University inspired colors and design tokens
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 215 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 25% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Temple University Cherry Red */
+    --primary: 355 61% 45%;
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 355 61% 55%;
+    --primary-soft: 355 40% 95%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Elegant Secondary Colors */
+    --secondary: 215 15% 95%;
+    --secondary-foreground: 215 25% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 215 15% 96%;
+    --muted-foreground: 215 15% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 355 30% 96%;
+    --accent-foreground: 355 61% 35%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    --success-soft: 142 50% 95%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --warning-soft: 38 70% 95%;
+
+    --border: 215 15% 90%;
+    --input: 215 15% 92%;
+    --ring: 355 61% 45%;
+
+    /* Design System Colors */
+    --temple-red: 355 61% 45%;
+    --temple-red-light: 355 61% 55%;
+    --temple-red-soft: 355 40% 95%;
+    
+    --neutral-50: 215 15% 98%;
+    --neutral-100: 215 15% 95%;
+    --neutral-200: 215 15% 90%;
+    --neutral-300: 215 15% 80%;
+    --neutral-400: 215 15% 60%;
+    --neutral-500: 215 15% 45%;
+    --neutral-600: 215 25% 35%;
+    --neutral-700: 215 25% 25%;
+    --neutral-800: 215 25% 15%;
+    --neutral-900: 215 30% 8%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--temple-red)), hsl(var(--temple-red-light)));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--temple-red)) 0%, hsl(var(--temple-red-light)) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--neutral-50)) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(var(--neutral-900) / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(var(--neutral-900) / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(var(--neutral-900) / 0.1);
+    --shadow-temple: 0 10px 25px -5px hsl(var(--temple-red) / 0.15);
+    --shadow-glow: 0 0 30px hsl(var(--temple-red) / 0.3);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
     --radius: 0.5rem;
 
