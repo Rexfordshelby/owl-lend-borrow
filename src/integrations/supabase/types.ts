@@ -86,49 +86,61 @@ export type Database = {
       }
       items: {
         Row: {
+          availability_schedule: string[] | null
           category: Database["public"]["Enums"]["item_category"]
-          condition: string
+          condition: Database["public"]["Enums"]["item_condition"]
           created_at: string
           daily_rate: number | null
           deposit_amount: number | null
           description: string | null
+          hourly_rate: number | null
           id: string
           image_urls: string[] | null
           is_available: boolean | null
+          is_service: boolean | null
           location: string | null
           owner_id: string
+          service_type: string | null
           tags: string[] | null
           title: string
           updated_at: string
         }
         Insert: {
+          availability_schedule?: string[] | null
           category: Database["public"]["Enums"]["item_category"]
-          condition: string
+          condition: Database["public"]["Enums"]["item_condition"]
           created_at?: string
           daily_rate?: number | null
           deposit_amount?: number | null
           description?: string | null
+          hourly_rate?: number | null
           id?: string
           image_urls?: string[] | null
           is_available?: boolean | null
+          is_service?: boolean | null
           location?: string | null
           owner_id: string
+          service_type?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
         }
         Update: {
+          availability_schedule?: string[] | null
           category?: Database["public"]["Enums"]["item_category"]
-          condition?: string
+          condition?: Database["public"]["Enums"]["item_condition"]
           created_at?: string
           daily_rate?: number | null
           deposit_amount?: number | null
           description?: string | null
+          hourly_rate?: number | null
           id?: string
           image_urls?: string[] | null
           is_available?: boolean | null
+          is_service?: boolean | null
           location?: string | null
           owner_id?: string
+          service_type?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
@@ -295,7 +307,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_total_cost: {
+        Args: {
+          end_date_param: string
+          item_id_param: string
+          start_date_param: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       item_category:
@@ -308,6 +327,8 @@ export type Database = {
         | "clothing"
         | "furniture"
         | "other"
+        | "services"
+      item_condition: "excellent" | "good" | "fair" | "poor"
       request_status:
         | "pending"
         | "approved"
@@ -452,7 +473,9 @@ export const Constants = {
         "clothing",
         "furniture",
         "other",
+        "services",
       ],
+      item_condition: ["excellent", "good", "fair", "poor"],
       request_status: [
         "pending",
         "approved",
