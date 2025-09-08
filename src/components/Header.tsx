@@ -101,6 +101,10 @@ const Header = () => {
                     <User className="mr-2 h-4 w-4" />
                     Dashboard
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/services')}>
+                    <User className="mr-2 h-4 w-4" />
+                    Services
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/orders')}>
                     <User className="mr-2 h-4 w-4" />
                     Orders

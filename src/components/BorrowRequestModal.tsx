@@ -33,6 +33,8 @@ const BorrowRequestModal: React.FC<BorrowRequestModalProps> = ({ isOpen, onClose
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [message, setMessage] = useState('');
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [contactInfo, setContactInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -83,13 +85,15 @@ const BorrowRequestModal: React.FC<BorrowRequestModalProps> = ({ isOpen, onClose
 
       toast({
         title: "Request Sent!",
-        description: `Your borrow request for "${item.title}" has been sent to ${item.owner.full_name}.`,
+        description: `Your borrow request for "${item.title}" has been sent to ${item.owner?.full_name || item.profiles?.full_name || 'the owner'}.`,
       });
 
       onClose();
       setStartDate(undefined);
       setEndDate(undefined);
       setMessage('');
+      setPickupAddress('');
+      setContactInfo('');
     } catch (error) {
       console.error('Error creating borrow request:', error);
       toast({
@@ -184,6 +188,28 @@ const BorrowRequestModal: React.FC<BorrowRequestModalProps> = ({ isOpen, onClose
           )}
 
           <div className="space-y-2">
+            <Label htmlFor="pickupAddress">Pickup/Meeting Address *</Label>
+            <Input
+              id="pickupAddress"
+              placeholder="e.g., Library, Student Center, Dorm Address"
+              value={pickupAddress}
+              onChange={(e) => setPickupAddress(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contactInfo">Contact Information *</Label>
+            <Input
+              id="contactInfo"
+              placeholder="Phone number or email for coordination"
+              value={contactInfo}
+              onChange={(e) => setContactInfo(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="message">Message (Optional)</Label>
             <Textarea
               id="message"
@@ -202,7 +228,7 @@ const BorrowRequestModal: React.FC<BorrowRequestModalProps> = ({ isOpen, onClose
               type="submit" 
               variant="temple" 
               className="flex-1"
-              disabled={!startDate || !endDate || loading}
+              disabled={!startDate || !endDate || !pickupAddress || !contactInfo || loading}
             >
               {loading ? "Sending..." : "Send Request"}
             </Button>
