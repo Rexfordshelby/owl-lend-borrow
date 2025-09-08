@@ -22,7 +22,10 @@ export type Database = {
           end_date: string
           id: string
           item_id: string
+          last_message_at: string | null
           message: string | null
+          negotiated_duration_days: number | null
+          negotiated_rate: number | null
           owner_id: string
           owner_response: string | null
           start_date: string
@@ -37,7 +40,10 @@ export type Database = {
           end_date: string
           id?: string
           item_id: string
+          last_message_at?: string | null
           message?: string | null
+          negotiated_duration_days?: number | null
+          negotiated_rate?: number | null
           owner_id: string
           owner_response?: string | null
           start_date: string
@@ -52,7 +58,10 @@ export type Database = {
           end_date?: string
           id?: string
           item_id?: string
+          last_message_at?: string | null
           message?: string | null
+          negotiated_duration_days?: number | null
+          negotiated_rate?: number | null
           owner_id?: string
           owner_response?: string | null
           start_date?: string
@@ -80,6 +89,35 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          borrow_request_id: string | null
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          borrow_request_id?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          borrow_request_id?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_borrow_request_id_fkey"
+            columns: ["borrow_request_id"]
+            isOneToOne: false
+            referencedRelation: "borrow_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -149,6 +187,57 @@ export type Database = {
           {
             foreignKeyName: "items_owner_id_fkey"
             columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message_type: string
+          offer_amount: number | null
+          offer_duration_days: number | null
+          sender_id: string | null
+        }
+        Insert: {
+          content: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          offer_amount?: number | null
+          offer_duration_days?: number | null
+          sender_id?: string | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          offer_amount?: number | null
+          offer_duration_days?: number | null
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -331,10 +420,12 @@ export type Database = {
       item_condition: "excellent" | "good" | "fair" | "poor"
       request_status:
         | "pending"
-        | "approved"
+        | "negotiating"
+        | "accepted"
         | "rejected"
-        | "borrowed"
-        | "returned"
+        | "cancelled"
+        | "active"
+        | "completed"
         | "overdue"
     }
     CompositeTypes: {
@@ -478,10 +569,12 @@ export const Constants = {
       item_condition: ["excellent", "good", "fair", "poor"],
       request_status: [
         "pending",
-        "approved",
+        "negotiating",
+        "accepted",
         "rejected",
-        "borrowed",
-        "returned",
+        "cancelled",
+        "active",
+        "completed",
         "overdue",
       ],
     },
