@@ -1,1 +1,14 @@
 project_id = "qqarrpymjodhzbifssuc"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[functions.create-payment]
+verify_jwt = true

@@ -14,7 +14,12 @@ import {
   XCircle,
   Handshake,
   Clock,
-  MessageCircle
+  MessageCircle,
+  ImageIcon,
+  CreditCard,
+  MapPin,
+  User,
+  Phone
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +35,7 @@ interface Message {
   offer_duration_days?: number;
   is_read: boolean;
   created_at: string;
+  image_url?: string;
   sender?: {
     full_name: string;
   };
@@ -51,7 +57,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
   const [offerDays, setOfferDays] = useState('');
   const [conversation, setConversation] = useState<any>(null);
   const [currentProfile, setCurrentProfile] = useState<any>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -166,19 +178,49 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
     };
   };
 
+  const uploadImage = async (file: File): Promise<string> => {
+    const fileName = `${Date.now()}-${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('chat-images')
+      .upload(fileName, file);
+
+    if (error) throw error;
+    
+    const { data: urlData } = supabase.storage
+      .from('chat-images')
+      .getPublicUrl(fileName);
+    
+    return urlData.publicUrl;
+  };
+
   const sendMessage = async () => {
-    if (!newMessage.trim() || !conversation?.id || !currentProfile?.id) return;
+    if ((!newMessage.trim() && !selectedImage) || !conversation?.id || !currentProfile?.id) return;
 
     setIsTyping(true);
+    setUploading(!!selectedImage);
+    
     try {
+      let imageUrl = null;
+      
+      // Upload image if selected
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+      }
+
+      const messageData: any = {
+        conversation_id: conversation.id,
+        sender_id: currentProfile.id,
+        message_type: selectedImage ? 'image' : 'text',
+        content: newMessage.trim() || (selectedImage ? 'Image' : '')
+      };
+
+      if (imageUrl) {
+        messageData.image_url = imageUrl;
+      }
+
       const { error } = await supabase
         .from('messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_id: currentProfile.id,
-          message_type: 'text',
-          content: newMessage
-        });
+        .insert(messageData);
 
       if (error) throw error;
 
@@ -191,6 +233,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
       }
 
       setNewMessage('');
+      setSelectedImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -200,6 +246,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
       });
     } finally {
       setIsTyping(false);
+      setUploading(false);
     }
   };
 
@@ -276,8 +323,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
 
       toast({
         title: "Offer accepted!",
-        description: "The terms have been agreed upon.",
+        description: "The terms have been agreed upon. Please proceed with payment.",
       });
+
+      // Show payment form for borrower
+      if (currentProfile.id === request.borrower_id) {
+        setShowPaymentForm(true);
+      }
 
       // Refresh messages to show the update
       fetchMessages();
@@ -286,6 +338,73 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
       toast({
         title: "Error",
         description: "Failed to accept offer",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!deliveryAddress.trim() || !contactPhone.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide delivery address and contact phone.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const finalAmount = request.negotiated_rate * request.negotiated_duration_days;
+      
+      // Create payment session
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: {
+          requestId: request.id,
+          amount: finalAmount,
+          description: `${request.item.title} - ${request.negotiated_duration_days} days rental`
+        }
+      });
+
+      if (error) throw error;
+
+      // Save delivery details
+      await supabase
+        .from('borrow_requests')
+        .update({
+          owner_response: JSON.stringify({
+            delivery_address: deliveryAddress,
+            contact_phone: contactPhone
+          })
+        })
+        .eq('id', request.id);
+
+      // Open Stripe checkout in new tab
+      window.open(data.url, '_blank');
+      
+      setShowPaymentForm(false);
+      
+      toast({
+        title: "Payment initiated",
+        description: "Complete your payment in the new window.",
+      });
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: "Failed to initiate payment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image file.",
         variant: "destructive",
       });
     }
@@ -375,6 +494,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
                   </div>
                 )}
                 
+                {message.image_url && (
+                  <div className="mt-2">
+                    <img 
+                      src={message.image_url} 
+                      alt="Shared image" 
+                      className="max-w-xs rounded-lg cursor-pointer hover:opacity-90"
+                      onClick={() => window.open(message.image_url, '_blank')}
+                    />
+                  </div>
+                )}
+                
                 <p>{message.content}</p>
                 
                 <div className="text-xs opacity-75">
@@ -389,7 +519,64 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
         {/* Input Area */}
         {request.status !== 'accepted' && request.status !== 'rejected' && (
           <div className="flex-shrink-0 p-4 border-t space-y-3">
-            {showOfferForm ? (
+            {showPaymentForm ? (
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-temple-red" />
+                    <h4 className="font-semibold">Complete Payment & Delivery Details</h4>
+                  </div>
+                  
+                  <div className="bg-temple-red-soft p-3 rounded-lg">
+                    <p className="font-medium">Final Total: ${(request.negotiated_rate * request.negotiated_duration_days).toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      ${request.negotiated_rate}/{request.item.is_service ? 'hour' : 'day'} × {request.negotiated_duration_days} days
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Delivery Address
+                      </label>
+                      <Textarea
+                        placeholder="Enter your full delivery address..."
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Contact Phone
+                      </label>
+                      <Input
+                        placeholder="Your phone number"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handlePayment} 
+                      disabled={!deliveryAddress.trim() || !contactPhone.trim()}
+                      className="bg-temple-red hover:bg-temple-red-dark"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Pay Now
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowPaymentForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : showOfferForm ? (
               <Card>
                 <CardContent className="p-4 space-y-3">
                   <h4 className="font-semibold">Make a Counter Offer</h4>
@@ -434,25 +621,65 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type your message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  disabled={isTyping}
-                />
-                <Button onClick={sendMessage} disabled={!newMessage.trim() || isTyping}>
-                  <Send className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowOfferForm(true)}
-                  className="whitespace-nowrap"
-                >
-                  <DollarSign className="h-4 w-4 mr-1" />
-                  Counter Offer
-                </Button>
+              <div className="space-y-3">
+                {selectedImage && (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                    <ImageIcon className="h-4 w-4" />
+                    <span className="text-sm">{selectedImage.name}</span>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => {
+                        setSelectedImage(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Type your message..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    disabled={isTyping || uploading}
+                  />
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    onClick={sendMessage} 
+                    disabled={(!newMessage.trim() && !selectedImage) || isTyping || uploading}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowOfferForm(true)}
+                    className="whitespace-nowrap"
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Counter Offer
+                  </Button>
+                </div>
               </div>
             )}
           </div>

@@ -28,8 +28,11 @@ export type Database = {
           negotiated_rate: number | null
           owner_id: string
           owner_response: string | null
+          payment_amount: number | null
+          payment_status: string | null
           start_date: string
           status: Database["public"]["Enums"]["request_status"] | null
+          stripe_payment_intent_id: string | null
           total_cost: number | null
           updated_at: string
         }
@@ -46,8 +49,11 @@ export type Database = {
           negotiated_rate?: number | null
           owner_id: string
           owner_response?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["request_status"] | null
+          stripe_payment_intent_id?: string | null
           total_cost?: number | null
           updated_at?: string
         }
@@ -64,8 +70,11 @@ export type Database = {
           negotiated_rate?: number | null
           owner_id?: string
           owner_response?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["request_status"] | null
+          stripe_payment_intent_id?: string | null
           total_cost?: number | null
           updated_at?: string
         }
@@ -199,6 +208,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string
           id: string
+          image_url: string | null
           is_read: boolean | null
           message_type: string
           offer_amount: number | null
@@ -210,6 +220,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           is_read?: boolean | null
           message_type?: string
           offer_amount?: number | null
@@ -221,6 +232,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           is_read?: boolean | null
           message_type?: string
           offer_amount?: number | null
