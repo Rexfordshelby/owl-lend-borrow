@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   MessageCircle, 
   Clock, 
@@ -11,12 +12,15 @@ import {
   XCircle, 
   AlertCircle,
   Calendar,
-  Star
+  Star,
+  MapPin,
+  Package
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import ChatInterface from './ChatInterface';
+import OrderStatusFlow from './OrderStatusFlow';
 import { formatDistanceToNow, format } from 'date-fns';
 
 interface MyBorrowRequest {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { X, Upload, Plus } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { X, Upload, Plus, ImageIcon, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
   });
   const [newTag, setNewTag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -100,6 +104,67 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     }));
   };
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length !== files.length) {
+      toast({
+        title: "Invalid files",
+        description: "Please select only image files.",
+        variant: "destructive",
+      });
+    }
+    
+    // Limit to 5 images max
+    const totalImages = selectedImages.length + imageFiles.length;
+    if (totalImages > 5) {
+      toast({
+        title: "Too many images",
+        description: "You can upload a maximum of 5 images.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedImages(prev => [...prev, ...imageFiles]);
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedImages.length === 0) return [];
+    
+    setUploadingImages(true);
+    const imageUrls: string[] = [];
+    
+    try {
+      for (const image of selectedImages) {
+        const fileName = `${Date.now()}-${image.name}`;
+        const { data, error } = await supabase.storage
+          .from('chat-images')
+          .upload(`items/${fileName}`, image);
+
+        if (error) throw error;
+        
+        const { data: urlData } = supabase.storage
+          .from('chat-images')
+          .getPublicUrl(`items/${fileName}`);
+        
+        imageUrls.push(urlData.publicUrl);
+      }
+      
+      return imageUrls;
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      throw error;
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -115,6 +180,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
 
       if (!profile) throw new Error('Profile not found');
 
+      // Upload images first
+      const imageUrls = await uploadImages();
+
       // Create item
       const { error } = await supabase.from('items').insert({
         title: formData.title,
@@ -126,6 +194,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
         deposit_amount: formData.deposit_amount ? parseFloat(formData.deposit_amount) : 0,
         location: formData.location || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
+        image_urls: imageUrls.length > 0 ? imageUrls : null,
         owner_id: profile.id,
         is_available: true,
         is_service: formData.is_service,
@@ -156,6 +225,10 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
         is_service: false,
         service_type: '',
       });
+      setSelectedImages([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       console.error('Error creating item:', error);
       toast({
@@ -352,6 +425,80 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
             )}
           </div>
 
+          {/* Image Upload */}
+          <div className="space-y-3">
+            <Label>Images ({selectedImages.length}/5)</Label>
+            <Card className="border-dashed border-2 border-gray-200 hover:border-temple-red transition-colors">
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <div className="space-y-2">
+                    <ImageIcon className="h-12 w-12 text-gray-400 mx-auto" />
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        Drag and drop images here, or{' '}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-temple-red hover:text-temple-red-dark font-medium"
+                        >
+                          browse
+                        </button>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Upload up to 5 images to showcase your {formData.is_service ? 'service' : 'item'}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-temple-red text-temple-red hover:bg-temple-red hover:text-white"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose Images
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {selectedImages.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {selectedImages.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                    <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      {index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
@@ -360,9 +507,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
               type="submit" 
               variant="temple" 
               className="flex-1"
-              disabled={!formData.title || !formData.category || (!formData.is_service && !formData.condition) || (formData.is_service && !formData.service_type) || loading}
+              disabled={!formData.title || !formData.category || (!formData.is_service && !formData.condition) || (formData.is_service && !formData.service_type) || loading || uploadingImages}
             >
-              {loading ? "Listing..." : `List ${formData.is_service ? 'Service' : 'Item'}`}
+              {loading ? "Listing..." : uploadingImages ? "Uploading..." : `List ${formData.is_service ? 'Service' : 'Item'}`}
             </Button>
           </div>
         </form>

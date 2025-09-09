@@ -426,163 +426,251 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0 pb-4 border-b">
           <DialogTitle className="flex items-center gap-3">
-            <MessageCircle className="h-5 w-5 text-temple-red" />
-            Chat & Negotiate - {request.item.title}
+            <div className="p-2 bg-temple-red-soft rounded-full">
+              <MessageCircle className="h-5 w-5 text-temple-red" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold">{request.item.title}</h3>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                <Badge variant="outline" className="border-temple-red text-temple-red">
+                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </Badge>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {format(new Date(request.start_date), 'MMM d')} - {format(new Date(request.end_date), 'MMM d')}
+                </span>
+                <span className="flex items-center gap-1">
+                  <DollarSign className="h-4 w-4" />
+                  ${request.item.is_service ? request.item.hourly_rate : request.item.daily_rate}/{request.item.is_service ? 'hour' : 'day'}
+                </span>
+              </div>
+            </div>
           </DialogTitle>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Badge variant="outline">
-              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-            </Badge>
-            <span className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              {format(new Date(request.start_date), 'MMM d')} - {format(new Date(request.end_date), 'MMM d')}
-            </span>
-            <span className="flex items-center gap-1">
-              <DollarSign className="h-4 w-4" />
-              ${request.item.is_service ? request.item.hourly_rate : request.item.daily_rate}/{request.item.is_service ? 'hour' : 'day'}
-            </span>
-          </div>
         </DialogHeader>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-50">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-neutral-50 to-white">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${
-                message.sender_id === currentProfile?.id ? 'justify-end' : 'justify-start'
+              className={`flex items-start gap-3 ${
+                message.sender_id === currentProfile?.id ? 'flex-row-reverse' : 'flex-row'
               }`}
             >
+              {/* Avatar */}
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                <AvatarFallback className="bg-temple-red text-white text-xs">
+                  {getInitials(message.sender?.full_name || 'User')}
+                </AvatarFallback>
+              </Avatar>
+
+              {/* Message Bubble */}
               <div
                 className={`max-w-[70%] ${
                   message.message_type === 'system'
-                    ? 'bg-blue-100 text-blue-800 mx-auto text-center'
+                    ? 'bg-blue-50 text-blue-800 mx-auto text-center border border-blue-200'
                     : message.sender_id === currentProfile?.id
-                    ? 'bg-temple-red text-white'
-                    : 'bg-white border'
-                } rounded-lg p-3 space-y-2`}
+                    ? 'bg-temple-red text-white shadow-lg'
+                    : 'bg-white border border-gray-200 shadow-sm'
+                } rounded-2xl px-4 py-3 space-y-2 relative`}
               >
+                {/* Message tail */}
+                <div 
+                  className={`absolute top-3 w-3 h-3 rotate-45 ${
+                    message.message_type === 'system' ? 'hidden' :
+                    message.sender_id === currentProfile?.id
+                      ? 'bg-temple-red -right-1'
+                      : 'bg-white border-l border-t border-gray-200 -left-1'
+                  }`}
+                />
+
+                {/* Sender name for received messages */}
+                {message.sender_id !== currentProfile?.id && message.message_type !== 'system' && (
+                  <p className="text-xs font-medium text-gray-500 mb-1">
+                    {message.sender?.full_name || 'User'}
+                  </p>
+                )}
+
                 {message.message_type === 'offer' && (
-                  <div className="bg-white/20 rounded p-2">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className={`${
+                    message.sender_id === currentProfile?.id 
+                      ? 'bg-white/20 text-white' 
+                      : 'bg-temple-red-soft text-temple-red'
+                  } rounded-xl p-3 space-y-2`}>
+                    <div className="flex items-center gap-2">
                       <Handshake className="h-4 w-4" />
-                      <span className="font-semibold">Counter Offer</span>
+                      <span className="font-semibold text-sm">Counter Offer</span>
                     </div>
-                    <p>Rate: ${message.offer_amount}/{request.item.is_service ? 'hour' : 'day'}</p>
-                    <p>Duration: {message.offer_duration_days} days</p>
-                    <p className="font-semibold">
-                      Total: ${((message.offer_amount || 0) * (message.offer_duration_days || 1)).toFixed(2)}
-                    </p>
+                    <div className="text-sm space-y-1">
+                      <p>Rate: <span className="font-medium">${message.offer_amount}/{request.item.is_service ? 'hour' : 'day'}</span></p>
+                      <p>Duration: <span className="font-medium">{message.offer_duration_days} days</span></p>
+                      <p className="font-bold text-base">
+                        Total: ${((message.offer_amount || 0) * (message.offer_duration_days || 1)).toFixed(2)}
+                      </p>
+                    </div>
                     
-                    {/* Accept/Reject buttons for offers (only for recipients) */}
+                    {/* Accept/Reject buttons for offers */}
                     {message.sender_id !== currentProfile?.id && 
                      request.status === 'negotiating' && (
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 pt-2">
                         <Button
                           size="sm"
                           onClick={() => acceptOffer(message.id, message.offer_amount!, message.offer_duration_days!)}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 text-white"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
+                          <CheckCircle className="h-3 w-3 mr-1" />
                           Accept
                         </Button>
                       </div>
                     )}
                   </div>
                 )}
-                
+
                 {message.image_url && (
                   <div className="mt-2">
                     <img 
                       src={message.image_url} 
                       alt="Shared image" 
-                      className="max-w-xs rounded-lg cursor-pointer hover:opacity-90"
+                      className="max-w-xs rounded-xl cursor-pointer hover:opacity-90 transition-opacity shadow-md"
                       onClick={() => window.open(message.image_url, '_blank')}
                     />
                   </div>
                 )}
                 
-                <p>{message.content}</p>
+                {message.content && (
+                  <p className={`text-sm ${message.message_type === 'system' ? 'text-center font-medium' : ''}`}>
+                    {message.content}
+                  </p>
+                )}
                 
-                <div className="text-xs opacity-75">
+                <div className={`text-xs opacity-75 ${
+                  message.sender_id === currentProfile?.id ? 'text-white/80' : 'text-gray-500'
+                }`}>
                   {formatDistanceToNow(new Date(message.created_at))} ago
                 </div>
               </div>
             </div>
           ))}
+          
+          {/* Typing indicator */}
+          {(isTyping || uploading) && (
+            <div className="flex items-center gap-3">
+              <Avatar className="w-8 h-8">
+                <AvatarFallback className="bg-gray-300 text-gray-600 text-xs">
+                  {uploading ? '📷' : '...'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         {request.status !== 'accepted' && request.status !== 'rejected' && (
-          <div className="flex-shrink-0 p-4 border-t space-y-3">
+          <div className="flex-shrink-0 p-6 border-t bg-white space-y-4">
             {showPaymentForm ? (
-              <Card>
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-temple-red" />
-                    <h4 className="font-semibold">Complete Payment & Delivery Details</h4>
+              <Card className="border-temple-red">
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-temple-red-soft rounded-full">
+                      <CreditCard className="h-6 w-6 text-temple-red" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold">Complete Your Order</h4>
+                      <p className="text-sm text-muted-foreground">Finalize payment and delivery details</p>
+                    </div>
                   </div>
                   
-                  <div className="bg-temple-red-soft p-3 rounded-lg">
-                    <p className="font-medium">Final Total: ${(request.negotiated_rate * request.negotiated_duration_days).toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ${request.negotiated_rate}/{request.item.is_service ? 'hour' : 'day'} × {request.negotiated_duration_days} days
-                    </p>
+                  <div className="bg-gradient-to-r from-temple-red-soft to-temple-red-light p-4 rounded-xl">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-lg font-bold text-temple-red">
+                          ${(request.negotiated_rate * request.negotiated_duration_days).toFixed(2)}
+                        </p>
+                        <p className="text-sm text-temple-red/80">
+                          ${request.negotiated_rate}/{request.item.is_service ? 'hour' : 'day'} × {request.negotiated_duration_days} days
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-temple-red">Final Total</p>
+                        <p className="text-xs text-temple-red/80">Including all fees</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                        <MapPin className="h-4 w-4 text-temple-red" />
                         Delivery Address
                       </label>
                       <Textarea
-                        placeholder="Enter your full delivery address..."
+                        placeholder="Enter your complete delivery address including postal code..."
                         value={deliveryAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
                         rows={3}
+                        className="resize-none border-gray-300 focus:border-temple-red"
                       />
                     </div>
                     
-                    <div>
-                      <label className="text-sm font-medium flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        Contact Phone
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                        <Phone className="h-4 w-4 text-temple-red" />
+                        Contact Phone Number
                       </label>
                       <Input
-                        placeholder="Your phone number"
+                        placeholder="Your phone number for delivery coordination"
                         value={contactPhone}
                         onChange={(e) => setContactPhone(e.target.value)}
+                        className="border-gray-300 focus:border-temple-red"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-3 pt-4">
                     <Button 
                       onClick={handlePayment} 
                       disabled={!deliveryAddress.trim() || !contactPhone.trim()}
-                      className="bg-temple-red hover:bg-temple-red-dark"
+                      className="flex-1 bg-temple-red hover:bg-temple-red-dark text-white py-3 text-base font-medium"
+                      size="lg"
                     >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Pay Now
+                      <CreditCard className="h-5 w-5 mr-2" />
+                      Proceed to Payment
                     </Button>
-                    <Button variant="outline" onClick={() => setShowPaymentForm(false)}>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowPaymentForm(false)}
+                      className="px-6 border-gray-300"
+                    >
                       Cancel
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ) : showOfferForm ? (
-              <Card>
-                <CardContent className="p-4 space-y-3">
-                  <h4 className="font-semibold">Make a Counter Offer</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm font-medium">
+              <Card className="border-temple-red">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-temple-red-soft rounded-full">
+                      <Handshake className="h-5 w-5 text-temple-red" />
+                    </div>
+                    <h4 className="text-lg font-semibold">Make a Counter Offer</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
                         Rate (${request.item.is_service ? 'per hour' : 'per day'})
                       </label>
                       <Input
@@ -591,41 +679,54 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
                         placeholder="0.00"
                         value={offerAmount}
                         onChange={(e) => setOfferAmount(e.target.value)}
+                        className="border-gray-300 focus:border-temple-red"
                       />
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Duration (days)</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Duration (days)</label>
                       <Input
                         type="number"
                         placeholder="Days"
                         value={offerDays}
                         onChange={(e) => setOfferDays(e.target.value)}
+                        className="border-gray-300 focus:border-temple-red"
                       />
                     </div>
                   </div>
+                  
                   {offerAmount && offerDays && (
-                    <div className="bg-temple-red-soft p-2 rounded">
-                      <p className="text-sm font-medium">
-                        Total: ${(parseFloat(offerAmount) * parseInt(offerDays)).toFixed(2)}
+                    <div className="bg-temple-red-soft p-4 rounded-xl">
+                      <p className="text-base font-bold text-temple-red">
+                        Total Offer: ${(parseFloat(offerAmount) * parseInt(offerDays)).toFixed(2)}
                       </p>
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <Button onClick={sendOffer} disabled={!offerAmount || !offerDays}>
+                  
+                  <div className="flex gap-3 pt-2">
+                    <Button 
+                      onClick={sendOffer} 
+                      disabled={!offerAmount || !offerDays}
+                      className="bg-temple-red hover:bg-temple-red-dark text-white"
+                    >
+                      <Handshake className="h-4 w-4 mr-2" />
                       Send Offer
                     </Button>
-                    <Button variant="outline" onClick={() => setShowOfferForm(false)}>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowOfferForm(false)}
+                      className="border-gray-300"
+                    >
                       Cancel
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {selectedImage && (
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                    <ImageIcon className="h-4 w-4" />
-                    <span className="text-sm">{selectedImage.name}</span>
+                  <div className="flex items-center gap-3 p-3 bg-temple-red-soft rounded-xl border border-temple-red-light">
+                    <ImageIcon className="h-5 w-5 text-temple-red" />
+                    <span className="text-sm font-medium text-temple-red flex-1">{selectedImage.name}</span>
                     <Button 
                       size="sm" 
                       variant="ghost" 
@@ -633,52 +734,69 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
                         setSelectedImage(null);
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
+                      className="h-8 w-8 p-0 hover:bg-temple-red-light text-temple-red"
                     >
                       ×
                     </Button>
                   </div>
                 )}
                 
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Type your message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    disabled={isTyping || uploading}
-                  />
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Textarea
+                      placeholder="Type your message here..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
+                      disabled={isTyping || uploading}
+                      rows={2}
+                      className="resize-none border-gray-300 focus:border-temple-red"
+                    />
+                  </div>
                   
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button 
-                    onClick={sendMessage} 
-                    disabled={(!newMessage.trim() && !selectedImage) || isTyping || uploading}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowOfferForm(true)}
-                    className="whitespace-nowrap"
-                  >
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    Counter Offer
-                  </Button>
+                  <div className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    
+                    <Button 
+                      variant="outline" 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="border-gray-300 hover:border-temple-red hover:text-temple-red"
+                      size="lg"
+                    >
+                      <ImageIcon className="h-5 w-5" />
+                    </Button>
+                    
+                    <Button 
+                      onClick={sendMessage} 
+                      disabled={(!newMessage.trim() && !selectedImage) || isTyping || uploading}
+                      className="bg-temple-red hover:bg-temple-red-dark text-white"
+                      size="lg"
+                    >
+                      <Send className="h-5 w-5" />
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowOfferForm(true)}
+                      className="whitespace-nowrap border-temple-red text-temple-red hover:bg-temple-red hover:text-white"
+                      size="lg"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Counter Offer
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -686,9 +804,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
         )}
 
         {(request.status === 'accepted' || request.status === 'rejected') && (
-          <div className="flex-shrink-0 p-4 border-t">
-            <div className="text-center text-muted-foreground">
-              <p>This conversation has ended. The request has been {request.status}.</p>
+          <div className="flex-shrink-0 p-6 border-t bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="text-center">
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                request.status === 'accepted' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {request.status === 'accepted' ? 
+                  <CheckCircle className="h-4 w-4" /> : 
+                  <XCircle className="h-4 w-4" />
+                }
+                Order {request.status === 'accepted' ? 'Completed' : 'Cancelled'}
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                This conversation has ended. The request has been {request.status}.
+              </p>
             </div>
           </div>
         )}
