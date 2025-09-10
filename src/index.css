@@ -64,21 +64,27 @@ All colors MUST be HSL.
     --neutral-800: 215 25% 15%;
     --neutral-900: 215 30% 8%;
 
-    /* Gradients */
+    /* Modern Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--temple-red)), hsl(var(--temple-red-light)));
     --gradient-hero: linear-gradient(135deg, hsl(var(--temple-red)) 0%, hsl(var(--temple-red-light)) 100%);
     --gradient-card: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--neutral-50)) 100%);
+    --gradient-chat-bubble: linear-gradient(135deg, hsl(var(--temple-red)) 0%, hsl(var(--temple-red-light)) 100%);
+    --gradient-glass: linear-gradient(135deg, hsl(var(--background) / 0.8) 0%, hsl(var(--neutral-50) / 0.9) 100%);
 
-    /* Shadows */
+    /* Modern Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(var(--neutral-900) / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(var(--neutral-900) / 0.1);
     --shadow-lg: 0 10px 15px -3px hsl(var(--neutral-900) / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(var(--neutral-900) / 0.1);
     --shadow-temple: 0 10px 25px -5px hsl(var(--temple-red) / 0.15);
     --shadow-glow: 0 0 30px hsl(var(--temple-red) / 0.3);
+    --shadow-bubble: 0 4px 12px hsl(var(--neutral-900) / 0.1);
+    --shadow-glass: 0 8px 32px hsl(var(--neutral-900) / 0.1);
 
-    /* Animations */
+    /* Modern Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 

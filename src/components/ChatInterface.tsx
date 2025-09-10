@@ -19,7 +19,10 @@ import {
   CreditCard,
   MapPin,
   User,
-  Phone
+  Phone,
+  Paperclip,
+  MoreVertical,
+  Star
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,780 +54,664 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [showOfferForm, setShowOfferForm] = useState(false);
-  const [offerAmount, setOfferAmount] = useState('');
-  const [offerDays, setOfferDays] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [conversation, setConversation] = useState<any>(null);
-  const [currentProfile, setCurrentProfile] = useState<any>(null);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [offerAmount, setOfferAmount] = useState<string>('');
+  const [offerDuration, setOfferDuration] = useState<string>('');
+  const [isTyping, setIsTyping] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  const [paymentFormData, setPaymentFormData] = useState({
+    deliveryAddress: '',
+    contactPhone: '',
+    specialInstructions: ''
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (user) {
-      initializeChat();
-      getCurrentProfile();
-    }
-  }, [user, request]);
+  const isOwner = user?.id === request.item?.owner_id;
+  const otherUser = isOwner ? request.borrower : request.item?.owner;
 
   useEffect(() => {
-    if (conversation?.id) {
-      fetchMessages();
-      setupRealtimeSubscription();
-    }
-  }, [conversation]);
+    loadConversation();
+    loadMessages();
+  }, [request.id]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const getCurrentProfile = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-    
-    setCurrentProfile(data);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const initializeChat = async () => {
+  const loadConversation = async () => {
     try {
-      // Check if conversation exists
-      let { data: existingConv } = await supabase
+      const { data, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('borrow_request_id', request.id)
         .single();
 
-      if (!existingConv) {
-        // Create new conversation
-        const { data: newConv, error } = await supabase
-          .from('conversations')
-          .insert({ borrow_request_id: request.id })
-          .select('*')
-          .single();
-
-        if (error) throw error;
-        existingConv = newConv;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading conversation:', error);
+        return;
       }
 
-      setConversation(existingConv);
+      if (data) {
+        setConversation(data);
+      } else {
+        const { data: newConversation, error: createError } = await supabase
+          .from('conversations')
+          .insert({ borrow_request_id: request.id })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating conversation:', createError);
+          return;
+        }
+        setConversation(newConversation);
+      }
     } catch (error) {
-      console.error('Error initializing chat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load chat",
-        variant: "destructive",
-      });
+      console.error('Error in loadConversation:', error);
     }
   };
 
-  const fetchMessages = async () => {
-    if (!conversation?.id) return;
-
+  const loadMessages = async () => {
     try {
+      const { data: conversationData } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('borrow_request_id', request.id)
+        .single();
+
+      if (!conversationData) return;
+
       const { data, error } = await supabase
         .from('messages')
         .select(`
           *,
-          sender:sender_id (
-            full_name
-          )
+          sender:sender_id(full_name)
         `)
-        .eq('conversation_id', conversation.id)
+        .eq('conversation_id', conversationData.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
+      if (error) {
+        console.error('Error loading messages:', error);
+        return;
+      }
 
-      // Mark messages as read
-      await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('conversation_id', conversation.id)
-        .neq('sender_id', currentProfile?.id);
+      setMessages(data || []);
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Error in loadMessages:', error);
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel(`chat-${conversation.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversation.id}`
-        },
-        (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
-        }
-      )
-      .subscribe();
+  const sendMessage = async (messageType: string = 'text', content: string = newMessage, extraData: any = {}) => {
+    if (!conversation) return;
+    if (messageType === 'text' && !content.trim()) return;
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const uploadImage = async (file: File): Promise<string> => {
-    const fileName = `${Date.now()}-${file.name}`;
-    const { data, error } = await supabase.storage
-      .from('chat-images')
-      .upload(fileName, file);
-
-    if (error) throw error;
-    
-    const { data: urlData } = supabase.storage
-      .from('chat-images')
-      .getPublicUrl(fileName);
-    
-    return urlData.publicUrl;
-  };
-
-  const sendMessage = async () => {
-    if ((!newMessage.trim() && !selectedImage) || !conversation?.id || !currentProfile?.id) return;
-
+    setIsLoading(true);
     setIsTyping(true);
-    setUploading(!!selectedImage);
-    
+
     try {
-      let imageUrl = null;
-      
-      // Upload image if selected
-      if (selectedImage) {
-        imageUrl = await uploadImage(selectedImage);
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (!profileData) {
+        toast({
+          title: "Error",
+          description: "Profile not found",
+          variant: "destructive",
+        });
+        return;
       }
 
-      const messageData: any = {
+      const messageData = {
         conversation_id: conversation.id,
-        sender_id: currentProfile.id,
-        message_type: selectedImage ? 'image' : 'text',
-        content: newMessage.trim() || (selectedImage ? 'Image' : '')
+        sender_id: profileData.id,
+        message_type: messageType,
+        content: content,
+        ...extraData,
       };
 
-      if (imageUrl) {
-        messageData.image_url = imageUrl;
-      }
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select(`
+          *,
+          sender:sender_id(full_name)
+        `)
+        .single();
 
-      if (error) throw error;
-
-      // Update request status to negotiating if it's pending
-      if (request.status === 'pending') {
-        await supabase
-          .from('borrow_requests')
-          .update({ status: 'negotiating' })
-          .eq('id', request.id);
+      if (error) {
+        console.error('Error sending message:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send message",
+          variant: "destructive",
+        });
+        return;
       }
 
+      setMessages(prev => [...prev, data]);
       setNewMessage('');
-      setSelectedImage(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      });
-    } finally {
-      setIsTyping(false);
-      setUploading(false);
-    }
-  };
-
-  const sendOffer = async () => {
-    if (!offerAmount || !offerDays || !conversation?.id || !currentProfile?.id) return;
-
-    try {
-      const amount = parseFloat(offerAmount);
-      const days = parseInt(offerDays);
-
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_id: currentProfile.id,
-          message_type: 'offer',
-          content: `Offer: $${amount}/${request.item.is_service ? 'hour' : 'day'} for ${days} days`,
-          offer_amount: amount,
-          offer_duration_days: days
-        });
-
-      if (error) throw error;
-
-      // Update request status to negotiating
-      await supabase
-        .from('borrow_requests')
-        .update({ 
-          status: 'negotiating',
-          negotiated_rate: amount,
-          negotiated_duration_days: days
-        })
-        .eq('id', request.id);
-
-      setShowOfferForm(false);
       setOfferAmount('');
-      setOfferDays('');
-
-      toast({
-        title: "Offer sent",
-        description: "Your counter-offer has been sent successfully.",
-      });
+      setOfferDuration('');
     } catch (error) {
-      console.error('Error sending offer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send offer",
-        variant: "destructive",
-      });
+      console.error('Error in sendMessage:', error);
+    } finally {
+      setIsLoading(false);
+      setIsTyping(false);
     }
   };
 
-  const acceptOffer = async (messageId: string, amount: number, days: number) => {
+  const sendOffer = () => {
+    if (!offerAmount || !offerDuration) {
+      toast({
+        title: "Error",
+        description: "Please enter both amount and duration",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const content = `I'd like to offer $${offerAmount} for ${offerDuration} days`;
+    sendMessage('offer', content, {
+      offer_amount: parseFloat(offerAmount),
+      offer_duration_days: parseInt(offerDuration),
+    });
+  };
+
+  const sendPaymentRequest = () => {
+    const content = `💳 Payment request: Please click to proceed with payment of $${request.total_cost}`;
+    sendMessage('payment_request', content);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     try {
-      // Update the request with the negotiated terms
-      await supabase
+      setIsLoading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `chat-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast({
+          title: "Error",
+          description: "Failed to upload image",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-images')
+        .getPublicUrl(filePath);
+
+      sendMessage('image', 'Shared an image', { image_url: publicUrl });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAcceptOffer = async (message: Message) => {
+    try {
+      const { error } = await supabase
         .from('borrow_requests')
-        .update({ 
+        .update({
           status: 'accepted',
-          negotiated_rate: amount,
-          negotiated_duration_days: days,
-          total_cost: amount * days
+          negotiated_rate: message.offer_amount,
+          negotiated_duration_days: message.offer_duration_days,
         })
         .eq('id', request.id);
 
-      // Send acceptance message
-      await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_id: currentProfile.id,
-          message_type: 'system',
-          content: `Offer accepted! Final terms: $${amount}/${request.item.is_service ? 'hour' : 'day'} for ${days} days`
-        });
-
-      toast({
-        title: "Offer accepted!",
-        description: "The terms have been agreed upon. Please proceed with payment.",
-      });
-
-      // Show payment form for borrower
-      if (currentProfile.id === request.borrower_id) {
-        setShowPaymentForm(true);
+      if (error) {
+        console.error('Error accepting offer:', error);
+        return;
       }
 
-      // Refresh messages to show the update
-      fetchMessages();
-    } catch (error) {
-      console.error('Error accepting offer:', error);
       toast({
-        title: "Error",
-        description: "Failed to accept offer",
-        variant: "destructive",
+        title: "Offer Accepted!",
+        description: "The borrower can now proceed with payment.",
       });
+
+      sendMessage('system', '✅ Offer accepted! You can now proceed with payment.');
+    } catch (error) {
+      console.error('Error in handleAcceptOffer:', error);
     }
   };
 
-  const handlePayment = async () => {
-    if (!deliveryAddress.trim() || !contactPhone.trim()) {
+  const handlePaymentClick = async () => {
+    if (!paymentFormData.deliveryAddress || !paymentFormData.contactPhone) {
       toast({
         title: "Missing Information",
-        description: "Please provide delivery address and contact phone.",
+        description: "Please provide delivery address and contact phone",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const finalAmount = request.negotiated_rate * request.negotiated_duration_days;
+      setIsLoading(true);
       
-      // Create payment session
       const { data, error } = await supabase.functions.invoke('create-payment', {
         body: {
           requestId: request.id,
-          amount: finalAmount,
-          description: `${request.item.title} - ${request.negotiated_duration_days} days rental`
-        }
+          amount: request.total_cost || request.negotiated_rate,
+          description: `Rental payment for ${request.item?.title}`,
+          deliveryAddress: paymentFormData.deliveryAddress,
+          contactPhone: paymentFormData.contactPhone,
+          specialInstructions: paymentFormData.specialInstructions,
+        },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Payment error:', error);
+        toast({
+          title: "Payment Error",
+          description: "Failed to create payment session",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Save delivery details
-      await supabase
-        .from('borrow_requests')
-        .update({
-          owner_response: JSON.stringify({
-            delivery_address: deliveryAddress,
-            contact_phone: contactPhone
-          })
-        })
-        .eq('id', request.id);
-
-      // Open Stripe checkout in new tab
+      // Open payment in new tab
       window.open(data.url, '_blank');
       
+      toast({
+        title: "Payment Initiated",
+        description: "Please complete payment in the new tab",
+      });
+
       setShowPaymentForm(false);
-      
-      toast({
-        title: "Payment initiated",
-        description: "Complete your payment in the new window.",
-      });
     } catch (error) {
-      console.error('Payment error:', error);
-      toast({
-        title: "Payment Error",
-        description: "Failed to initiate payment. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Error initiating payment:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedImage(file);
-    } else {
-      toast({
-        title: "Invalid file",
-        description: "Please select an image file.",
-        variant: "destructive",
-      });
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-warning/20 text-warning-foreground border-warning/30';
+      case 'accepted':
+        return 'bg-success/20 text-success-foreground border-success/30';
+      case 'completed':
+        return 'bg-primary/20 text-primary-foreground border-primary/30';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase();
-  };
-
-  const isOwner = currentProfile?.id === request.owner_id;
-
-  return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0 pb-4 border-b">
-          <DialogTitle className="flex items-center gap-3">
-            <div className="p-2 bg-temple-red-soft rounded-full">
-              <MessageCircle className="h-5 w-5 text-temple-red" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold">{request.item.title}</h3>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                <Badge variant="outline" className="border-temple-red text-temple-red">
-                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                </Badge>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(request.start_date), 'MMM d')} - {format(new Date(request.end_date), 'MMM d')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  ${request.item.is_service ? request.item.hourly_rate : request.item.daily_rate}/{request.item.is_service ? 'hour' : 'day'}
-                </span>
-              </div>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-neutral-50 to-white">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex items-start gap-3 ${
-                message.sender_id === currentProfile?.id ? 'flex-row-reverse' : 'flex-row'
-              }`}
-            >
-              {/* Avatar */}
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback className="bg-temple-red text-white text-xs">
-                  {getInitials(message.sender?.full_name || 'User')}
-                </AvatarFallback>
-              </Avatar>
-
-              {/* Message Bubble */}
-              <div
-                className={`max-w-[70%] ${
-                  message.message_type === 'system'
-                    ? 'bg-blue-50 text-blue-800 mx-auto text-center border border-blue-200'
-                    : message.sender_id === currentProfile?.id
-                    ? 'bg-temple-red text-white shadow-lg'
-                    : 'bg-white border border-gray-200 shadow-sm'
-                } rounded-2xl px-4 py-3 space-y-2 relative`}
-              >
-                {/* Message tail */}
-                <div 
-                  className={`absolute top-3 w-3 h-3 rotate-45 ${
-                    message.message_type === 'system' ? 'hidden' :
-                    message.sender_id === currentProfile?.id
-                      ? 'bg-temple-red -right-1'
-                      : 'bg-white border-l border-t border-gray-200 -left-1'
-                  }`}
-                />
-
-                {/* Sender name for received messages */}
-                {message.sender_id !== currentProfile?.id && message.message_type !== 'system' && (
-                  <p className="text-xs font-medium text-gray-500 mb-1">
-                    {message.sender?.full_name || 'User'}
-                  </p>
-                )}
-
-                {message.message_type === 'offer' && (
-                  <div className={`${
-                    message.sender_id === currentProfile?.id 
-                      ? 'bg-white/20 text-white' 
-                      : 'bg-temple-red-soft text-temple-red'
-                  } rounded-xl p-3 space-y-2`}>
-                    <div className="flex items-center gap-2">
-                      <Handshake className="h-4 w-4" />
-                      <span className="font-semibold text-sm">Counter Offer</span>
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <p>Rate: <span className="font-medium">${message.offer_amount}/{request.item.is_service ? 'hour' : 'day'}</span></p>
-                      <p>Duration: <span className="font-medium">{message.offer_duration_days} days</span></p>
-                      <p className="font-bold text-base">
-                        Total: ${((message.offer_amount || 0) * (message.offer_duration_days || 1)).toFixed(2)}
-                      </p>
-                    </div>
-                    
-                    {/* Accept/Reject buttons for offers */}
-                    {message.sender_id !== currentProfile?.id && 
-                     request.status === 'negotiating' && (
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          onClick={() => acceptOffer(message.id, message.offer_amount!, message.offer_duration_days!)}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Accept
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {message.image_url && (
-                  <div className="mt-2">
-                    <img 
-                      src={message.image_url} 
-                      alt="Shared image" 
-                      className="max-w-xs rounded-xl cursor-pointer hover:opacity-90 transition-opacity shadow-md"
-                      onClick={() => window.open(message.image_url, '_blank')}
-                    />
-                  </div>
-                )}
-                
-                {message.content && (
-                  <p className={`text-sm ${message.message_type === 'system' ? 'text-center font-medium' : ''}`}>
-                    {message.content}
-                  </p>
-                )}
-                
-                <div className={`text-xs opacity-75 ${
-                  message.sender_id === currentProfile?.id ? 'text-white/80' : 'text-gray-500'
-                }`}>
-                  {formatDistanceToNow(new Date(message.created_at))} ago
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {/* Typing indicator */}
-          {(isTyping || uploading) && (
-            <div className="flex items-center gap-3">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-gray-300 text-gray-600 text-xs">
-                  {uploading ? '📷' : '...'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-gray-100 rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
+  const renderMessage = (message: Message, index: number) => {
+    const isCurrentUser = message.sender_id === (user as any)?.profile?.id;
+    const isSystemMessage = message.message_type === 'system';
+    const isPaymentRequest = message.message_type === 'payment_request';
+    
+    if (isSystemMessage) {
+      return (
+        <div key={message.id} className="flex justify-center my-4">
+          <div className="bg-muted/60 backdrop-blur-sm text-muted-foreground px-4 py-2 rounded-full text-sm">
+            {message.content}
+          </div>
         </div>
+      );
+    }
 
-        {/* Input Area */}
-        {request.status !== 'accepted' && request.status !== 'rejected' && (
-          <div className="flex-shrink-0 p-6 border-t bg-white space-y-4">
-            {showPaymentForm ? (
-              <Card className="border-temple-red">
-                <CardContent className="p-6 space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-temple-red-soft rounded-full">
-                      <CreditCard className="h-6 w-6 text-temple-red" />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-semibold">Complete Your Order</h4>
-                      <p className="text-sm text-muted-foreground">Finalize payment and delivery details</p>
-                    </div>
+    return (
+      <div key={message.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-4 group animate-fade-in`}>
+        <div className={`flex ${isCurrentUser ? 'flex-row-reverse' : 'flex-row'} items-start gap-3 max-w-[85%]`}>
+          <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
+            <AvatarImage src={otherUser?.avatar_url} />
+            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-accent/20">
+              {message.sender?.full_name?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+            <div className={`
+              px-4 py-3 rounded-2xl shadow-bubble backdrop-blur-sm border transition-all duration-300 group-hover:shadow-lg
+              ${isCurrentUser 
+                ? 'bg-gradient-to-br from-primary to-primary-glow text-primary-foreground border-primary/20' 
+                : 'bg-glass-medium border-border/50 text-foreground'
+              }
+              ${isPaymentRequest ? 'border-primary ring-2 ring-primary/20' : ''}
+            `}>
+              {message.message_type === 'offer' && (
+                <div className="flex items-center gap-2 mb-2 text-sm opacity-80">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Offer</span>
+                </div>
+              )}
+              
+              {isPaymentRequest && (
+                <div className="flex items-center gap-2 mb-2 text-sm">
+                  <CreditCard className="h-4 w-4" />
+                  <span className="font-medium">Payment Request</span>
+                </div>
+              )}
+
+              <p className="text-sm leading-relaxed">{message.content}</p>
+              
+              {message.image_url && (
+                <img 
+                  src={message.image_url} 
+                  alt="Shared image" 
+                  className="mt-2 rounded-lg max-w-xs max-h-48 object-cover border border-border/20"
+                />
+              )}
+              
+              {message.offer_amount && message.offer_duration_days && (
+                <div className="mt-3 pt-3 border-t border-current/20 space-y-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="h-4 w-4" />
+                    <span className="font-medium">${message.offer_amount}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span>{message.offer_duration_days} days</span>
                   </div>
                   
-                  <div className="bg-gradient-to-r from-temple-red-soft to-temple-red-light p-4 rounded-xl">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-lg font-bold text-temple-red">
-                          ${(request.negotiated_rate * request.negotiated_duration_days).toFixed(2)}
-                        </p>
-                        <p className="text-sm text-temple-red/80">
-                          ${request.negotiated_rate}/{request.item.is_service ? 'hour' : 'day'} × {request.negotiated_duration_days} days
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-temple-red">Final Total</p>
-                        <p className="text-xs text-temple-red/80">Including all fees</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
-                        <MapPin className="h-4 w-4 text-temple-red" />
-                        Delivery Address
-                      </label>
-                      <Textarea
-                        placeholder="Enter your complete delivery address including postal code..."
-                        value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                        rows={3}
-                        className="resize-none border-gray-300 focus:border-temple-red"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
-                        <Phone className="h-4 w-4 text-temple-red" />
-                        Contact Phone Number
-                      </label>
-                      <Input
-                        placeholder="Your phone number for delivery coordination"
-                        value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                        className="border-gray-300 focus:border-temple-red"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handlePayment} 
-                      disabled={!deliveryAddress.trim() || !contactPhone.trim()}
-                      className="flex-1 bg-temple-red hover:bg-temple-red-dark text-white py-3 text-base font-medium"
-                      size="lg"
-                    >
-                      <CreditCard className="h-5 w-5 mr-2" />
-                      Proceed to Payment
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowPaymentForm(false)}
-                      className="px-6 border-gray-300"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : showOfferForm ? (
-              <Card className="border-temple-red">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-temple-red-soft rounded-full">
-                      <Handshake className="h-5 w-5 text-temple-red" />
-                    </div>
-                    <h4 className="text-lg font-semibold">Make a Counter Offer</h4>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Rate (${request.item.is_service ? 'per hour' : 'per day'})
-                      </label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={offerAmount}
-                        onChange={(e) => setOfferAmount(e.target.value)}
-                        className="border-gray-300 focus:border-temple-red"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Duration (days)</label>
-                      <Input
-                        type="number"
-                        placeholder="Days"
-                        value={offerDays}
-                        onChange={(e) => setOfferDays(e.target.value)}
-                        className="border-gray-300 focus:border-temple-red"
-                      />
-                    </div>
-                  </div>
-                  
-                  {offerAmount && offerDays && (
-                    <div className="bg-temple-red-soft p-4 rounded-xl">
-                      <p className="text-base font-bold text-temple-red">
-                        Total Offer: ${(parseFloat(offerAmount) * parseInt(offerDays)).toFixed(2)}
-                      </p>
+                  {isOwner && message.message_type === 'offer' && request.status === 'pending' && (
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptOffer(message)}
+                        className="bg-success hover:bg-success/90 text-success-foreground"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Accept
+                      </Button>
                     </div>
                   )}
-                  
-                  <div className="flex gap-3 pt-2">
-                    <Button 
-                      onClick={sendOffer} 
-                      disabled={!offerAmount || !offerDays}
-                      className="bg-temple-red hover:bg-temple-red-dark text-white"
-                    >
-                      <Handshake className="h-4 w-4 mr-2" />
-                      Send Offer
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowOfferForm(false)}
-                      className="border-gray-300"
-                    >
-                      Cancel
-                    </Button>
+                </div>
+              )}
+
+              {isPaymentRequest && !isCurrentUser && request.status === 'accepted' && (
+                <Button
+                  onClick={() => setShowPaymentForm(true)}
+                  className="mt-3 w-full bg-success hover:bg-success/90 text-success-foreground"
+                  size="sm"
+                >
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  Proceed to Payment
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2 mt-1 px-1">
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+              </span>
+              {isCurrentUser && (
+                <div className="h-1 w-1 rounded-full bg-primary/60" />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl h-[80vh] p-0 bg-gradient-to-br from-background to-neutral-50 border-0 shadow-2xl">
+          {/* Modern Header */}
+          <DialogHeader className="px-6 py-4 border-b border-border/50 bg-glass-medium backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-md">
+                  <AvatarImage src={otherUser?.avatar_url} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 text-primary font-semibold">
+                    {otherUser?.full_name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <DialogTitle className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                    {otherUser?.full_name || 'Unknown User'}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={`${getStatusBadgeStyle(request.status)} border`}>
+                      {request.status}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {request.item?.title}
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {selectedImage && (
-                  <div className="flex items-center gap-3 p-3 bg-temple-red-soft rounded-xl border border-temple-red-light">
-                    <ImageIcon className="h-5 w-5 text-temple-red" />
-                    <span className="text-sm font-medium text-temple-red flex-1">{selectedImage.name}</span>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => {
-                        setSelectedImage(null);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
-                      className="h-8 w-8 p-0 hover:bg-temple-red-light text-temple-red"
-                    >
-                      ×
-                    </Button>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {isTyping && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-100" />
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-200" />
+                    </div>
+                    <span>typing...</span>
                   </div>
                 )}
-                
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <Textarea
-                      placeholder="Type your message here..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          sendMessage();
-                        }
-                      }}
-                      disabled={isTyping || uploading}
-                      rows={2}
-                      className="resize-none border-gray-300 focus:border-temple-red"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
-                    
-                    <Button 
-                      variant="outline" 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="border-gray-300 hover:border-temple-red hover:text-temple-red"
-                      size="lg"
-                    >
-                      <ImageIcon className="h-5 w-5" />
-                    </Button>
-                    
-                    <Button 
-                      onClick={sendMessage} 
-                      disabled={(!newMessage.trim() && !selectedImage) || isTyping || uploading}
-                      className="bg-temple-red hover:bg-temple-red-dark text-white"
-                      size="lg"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                    
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowOfferForm(true)}
-                      className="whitespace-nowrap border-temple-red text-temple-red hover:bg-temple-red hover:text-white"
-                      size="lg"
-                    >
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Counter Offer
-                    </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gradient-to-b from-background/50 to-background">
+            {messages.map(renderMessage)}
+            {isLoading && (
+              <div className="flex justify-center">
+                <div className="bg-muted/60 backdrop-blur-sm px-4 py-2 rounded-full">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                    Sending...
                   </div>
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
 
-        {(request.status === 'accepted' || request.status === 'rejected') && (
-          <div className="flex-shrink-0 p-6 border-t bg-gradient-to-r from-gray-50 to-gray-100">
-            <div className="text-center">
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-                request.status === 'accepted' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {request.status === 'accepted' ? 
-                  <CheckCircle className="h-4 w-4" /> : 
-                  <XCircle className="h-4 w-4" />
-                }
-                Order {request.status === 'accepted' ? 'Completed' : 'Cancelled'}
+          {/* Input Area */}
+          <div className="border-t border-border/50 bg-glass-medium backdrop-blur-sm p-4">
+            {/* Quick Actions */}
+            {request.status === 'accepted' && isOwner && (
+              <div className="mb-4 p-3 bg-gradient-to-r from-success/10 to-success/5 rounded-lg border border-success/20">
+                <p className="text-sm text-success-foreground mb-2 font-medium">Order accepted! Send payment request:</p>
+                <Button 
+                  onClick={sendPaymentRequest}
+                  className="bg-success hover:bg-success/90 text-success-foreground"
+                  size="sm"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Send Payment Request
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                This conversation has ended. The request has been {request.status}.
-              </p>
+            )}
+
+            {/* Offer Section */}
+            {!isOwner && request.status === 'pending' && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg border border-primary/20">
+                <h4 className="font-medium text-primary mb-3 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Make an Offer
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Amount ($)</label>
+                    <Input
+                      type="number"
+                      value={offerAmount}
+                      onChange={(e) => setOfferAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Duration (days)</label>
+                    <Input
+                      type="number"
+                      value={offerDuration}
+                      onChange={(e) => setOfferDuration(e.target.value)}
+                      placeholder="7"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={sendOffer} 
+                  className="mt-3 bg-primary hover:bg-primary/90"
+                  disabled={!offerAmount || !offerDuration}
+                >
+                  <Handshake className="h-4 w-4 mr-2" />
+                  Send Offer
+                </Button>
+              </div>
+            )}
+
+            {/* Message Input */}
+            <div className="flex items-end gap-3">
+              <div className="flex-1 relative">
+                <Textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  className="min-h-[48px] max-h-32 resize-none pr-12 bg-background/80 backdrop-blur-sm border-border/50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 bottom-2 h-8 w-8 p-0 hover:bg-primary/10"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <Button 
+                onClick={() => sendMessage()}
+                disabled={!newMessage.trim() || isLoading}
+                className="h-12 w-12 p-0 bg-gradient-to-r from-primary to-primary-glow hover:shadow-lg transition-all duration-300"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Form Modal */}
+      <Dialog open={showPaymentForm} onOpenChange={setShowPaymentForm}>
+        <DialogContent className="max-w-md bg-gradient-to-br from-background to-neutral-50 border-0 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Payment Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Total Amount:</span>
+                <span className="text-xl font-bold text-primary">
+                  ${request.total_cost || request.negotiated_rate}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                <MapPin className="inline h-4 w-4 mr-1" />
+                Delivery Address *
+              </label>
+              <Textarea
+                value={paymentFormData.deliveryAddress}
+                onChange={(e) => setPaymentFormData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                placeholder="Enter your delivery address..."
+                className="bg-background/80"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                <Phone className="inline h-4 w-4 mr-1" />
+                Contact Phone *
+              </label>
+              <Input
+                value={paymentFormData.contactPhone}
+                onChange={(e) => setPaymentFormData(prev => ({ ...prev, contactPhone: e.target.value }))}
+                placeholder="Your phone number"
+                className="bg-background/80"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Special Instructions (Optional)
+              </label>
+              <Textarea
+                value={paymentFormData.specialInstructions}
+                onChange={(e) => setPaymentFormData(prev => ({ ...prev, specialInstructions: e.target.value }))}
+                placeholder="Any special delivery instructions..."
+                className="bg-background/80"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPaymentForm(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePaymentClick}
+                disabled={isLoading || !paymentFormData.deliveryAddress || !paymentFormData.contactPhone}
+                className="flex-1 bg-gradient-to-r from-success to-success/90 hover:shadow-lg"
+              >
+                {isLoading ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                Proceed to Payment
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
