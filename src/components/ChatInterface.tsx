@@ -25,6 +25,7 @@ import {
   Star
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { STRIPE_PUBLISHABLE_KEY } from '@/lib/stripe';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -332,11 +333,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ request, onClose }) => {
       window.open(data.url, '_blank');
       
       toast({
-        title: "Payment Initiated",
-        description: "Please complete payment in the new tab",
+        title: "Payment Processing",
+        description: "Secure payment window opened. Complete your payment to finalize the order. This chat will remain open for continued communication.",
+        duration: 6000,
       });
 
+      // Keep payment form closed but chat open for continued communication
       setShowPaymentForm(false);
+      
+      // Send system message about payment initiation
+      sendMessage('system', '💳 Payment window opened! Complete your payment to finalize this order. Feel free to continue chatting here.');
     } catch (error) {
       console.error('Error initiating payment:', error);
     } finally {

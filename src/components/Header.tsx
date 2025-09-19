@@ -36,12 +36,12 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-temple-red to-temple-red-light rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">TB</span>
+        <Link to="/" className="flex items-center space-x-2 animate-fade-in">
+          <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-glow rounded-xl flex items-center justify-center shadow-glow">
+            <span className="text-white font-bold text-sm">BP</span>
           </div>
-          <span className="font-bold text-xl bg-gradient-to-r from-temple-red to-temple-red-light bg-clip-text text-transparent">
-            TempleBorrow
+          <span className="font-bold text-xl bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            BorrowPal
           </span>
         </Link>
 
@@ -63,7 +63,7 @@ const Header = () => {
             <>
               {/* Add Item Button */}
               <Button 
-                variant="temple" 
+                variant="premium" 
                 size="sm" 
                 className="hidden sm:flex"
                 onClick={() => setShowAddModal(true)}
@@ -79,9 +79,9 @@ const Header = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-10 w-10 ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300">
                       <AvatarImage src="" alt="Profile" />
-                      <AvatarFallback className="bg-temple-red-soft text-temple-red">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary-glow text-white">
                         {getInitials(user.user_metadata?.full_name || user.email?.substring(0, 2) || 'U')}
                       </AvatarFallback>
                     </Avatar>
@@ -123,10 +123,10 @@ const Header = () => {
             </>
           ) : (
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={() => navigate('/auth')}>
+              <Button variant="ghost" onClick={() => navigate('/auth')} className="hover-scale">
                 Sign In
               </Button>
-              <Button variant="temple" onClick={() => navigate('/auth')}>
+              <Button variant="premium" onClick={() => navigate('/auth')} className="animate-pulse-soft">
                 Sign Up
               </Button>
             </div>

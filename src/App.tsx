@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import Services from "./pages/Services";
 import NotFound from "./pages/NotFound";
+import PaymentSuccess from "./components/PaymentSuccess";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Orders />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/payment-success" 
+                element={
+                  <ProtectedRoute>
+                    <PaymentSuccess />
                   </ProtectedRoute>
                 } 
               />

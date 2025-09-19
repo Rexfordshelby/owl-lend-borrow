@@ -9,7 +9,7 @@ const Orders = () => {
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-temple-red to-temple-red-light bg-clip-text text-transparent">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent animate-fade-in">
           Order Center
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
